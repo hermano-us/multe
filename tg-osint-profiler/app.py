@@ -16,8 +16,54 @@ st.title("🕵️ Telegram OSINT Profiler v1.1")
 st.markdown("**Telethon + Maigret** | Поиск по username · ID · телефону · forward")
 
 # ====================== СЕССИЯ И API ======================
+# ====================== TELETHON CLIENT (исправленная версия) ======================
 if "telethon_client" not in st.session_state:
     st.session_state.telethon_client = None
+if "auth_step" not in st.session_state:
+    st.session_state.auth_step = "phone"   # phone → code → done
+if "phone" not in st.session_state:
+    st.session_state.phone = ""
+if "code" not in st.session_state:
+    st.session_state.code = ""
+
+async def get_telethon_client():
+    if st.session_state.telethon_client is not None and await st.session_state.telethon_client.is_user_authorized():
+        return st.session_state.telethon_client
+
+    client = TelegramClient(SESSION_NAME, int(API_ID), API_HASH)
+    await client.connect()
+
+    if not await client.is_user_authorized():
+        if st.session_state.auth_step == "phone":
+            phone = st.text_input("Введите номер телефона (+7XXXXXXXXXX)", 
+                                  value=st.session_state.phone, 
+                                  key="phone_input")
+            if st.button("Отправить код", key="send_code"):
+                st.session_state.phone = phone
+                try:
+                    await client.send_code_request(phone)
+                    st.session_state.auth_step = "code"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Ошибка отправки кода: {e}")
+        elif st.session_state.auth_step == "code":
+            st.info(f"Код отправлен на номер {st.session_state.phone}")
+            code = st.text_input("Введите код из Telegram", key="code_input")
+            if st.button("Войти", key="login_button"):
+                try:
+                    await client.sign_in(st.session_state.phone, code)
+                    st.success("✅ Авторизация прошла успешно!")
+                    st.session_state.auth_step = "done"
+                    st.rerun()
+                except SessionPasswordNeededError:
+                    st.error("Включён двухфакторный пароль. Пока не поддерживается в этом MVP.")
+                except Exception as e:
+                    st.error(f"Ошибка входа: {e}")
+    else:
+        st.session_state.auth_step = "done"
+
+    st.session_state.telethon_client = client
+    return client
 
 API_ID = st.secrets.get("API_ID") or os.getenv("API_ID")
 API_HASH = st.secrets.get("API_HASH") or os.getenv("API_HASH")
