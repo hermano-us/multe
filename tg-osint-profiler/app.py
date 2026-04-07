@@ -17,12 +17,16 @@ st.markdown("**Telethon + Maigret** | Поиск по username · ID · теле
 
 # ====================== СЕССИЯ И API ======================
 # ====================== TELETHON CLIENT (исправленная версия) ======================
+# ====================== TELETHON CLIENT С ПОДДЕРЖКОЙ 2FA ======================
 if "telethon_client" not in st.session_state:
     st.session_state.telethon_client = None
+
 if "auth_step" not in st.session_state:
-    st.session_state.auth_step = "phone"   # phone → code → done
+    st.session_state.auth_step = "phone"      # phone → code → password → done
 if "phone" not in st.session_state:
     st.session_state.phone = ""
+if "phone_code_hash" not in st.session_state:
+    st.session_state.phone_code_hash = None
 if "code" not in st.session_state:
     st.session_state.code = ""
 
@@ -35,33 +39,72 @@ async def get_telethon_client():
 
     if not await client.is_user_authorized():
         if st.session_state.auth_step == "phone":
+            st.subheader("🔐 Авторизация в Telegram")
             phone = st.text_input("Введите номер телефона (+7XXXXXXXXXX)", 
                                   value=st.session_state.phone, 
                                   key="phone_input")
-            if st.button("Отправить код", key="send_code"):
+            
+            if st.button("Отправить код подтверждения", type="primary", key="send_code_btn"):
+                if not phone:
+                    st.error("Введите номер телефона")
+                    st.stop()
                 st.session_state.phone = phone
                 try:
-                    await client.send_code_request(phone)
+                    sent = await client.send_code_request(phone)
+                    st.session_state.phone_code_hash = sent.phone_code_hash
                     st.session_state.auth_step = "code"
                     st.rerun()
                 except Exception as e:
                     st.error(f"Ошибка отправки кода: {e}")
+
         elif st.session_state.auth_step == "code":
-            st.info(f"Код отправлен на номер {st.session_state.phone}")
-            code = st.text_input("Введите код из Telegram", key="code_input")
-            if st.button("Войти", key="login_button"):
+            st.subheader("🔐 Авторизация в Telegram")
+            st.info(f"Код отправлен на номер **{st.session_state.phone}**")
+            
+            code = st.text_input("Введите код из Telegram (5 цифр)", 
+                                 value=st.session_state.code, 
+                                 key="code_input")
+            
+            if st.button("Подтвердить код", type="primary", key="confirm_code_btn"):
+                if not code:
+                    st.error("Введите код")
+                    st.stop()
                 try:
-                    await client.sign_in(st.session_state.phone, code)
-                    st.success("✅ Авторизация прошла успешно!")
+                    await client.sign_in(
+                        phone=st.session_state.phone,
+                        code=code,
+                        phone_code_hash=st.session_state.phone_code_hash
+                    )
+                    st.success("✅ Код принят!")
                     st.session_state.auth_step = "done"
                     st.rerun()
                 except SessionPasswordNeededError:
-                    st.error("Включён двухфакторный пароль. Пока не поддерживается в этом MVP.")
+                    st.session_state.auth_step = "password"
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Ошибка входа: {e}")
-    else:
-        st.session_state.auth_step = "done"
+                    st.error(f"Ошибка при вводе кода: {e}")
 
+        elif st.session_state.auth_step == "password":
+            st.subheader("🔐 Включена двухфакторная аутентификация (2FA)")
+            st.info("Введите пароль от 2FA аккаунта Telegram")
+            
+            password = st.text_input("Пароль от двухфакторной аутентификации", 
+                                     type="password", 
+                                     key="password_input")
+            
+            if st.button("Войти с паролем", type="primary", key="login_2fa_btn"):
+                if not password:
+                    st.error("Введите пароль")
+                    st.stop()
+                try:
+                    await client.sign_in(password=password)
+                    st.success("✅ Авторизация с 2FA прошла успешно!")
+                    st.session_state.auth_step = "done"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Неверный пароль или ошибка: {e}")
+
+    # Сохраняем клиент
     st.session_state.telethon_client = client
     return client
 
