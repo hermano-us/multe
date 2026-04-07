@@ -15,6 +15,9 @@ st.set_page_config(page_title="Telegram OSINT Profiler v1.1", page_icon="🕵️
 st.title("🕵️ Telegram OSINT Profiler v1.1")
 st.markdown("**Telethon + Maigret** | Поиск по username · ID · телефону · forward")
 
+# ====================== КОНСТАНТЫ ======================
+SESSION_NAME = "tg_osint_session"   # Имя файла сессии (будет сохранён как tg_osint_session.session)
+
 # ====================== СЕССИЯ И API ======================
 # ====================== TELETHON CLIENT (исправленная версия) ======================
 # ====================== TELETHON CLIENT С ПОДДЕРЖКОЙ 2FA ======================
