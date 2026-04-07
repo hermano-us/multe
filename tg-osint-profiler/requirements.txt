@@ -1,4 +1,6 @@
 streamlit
-requests
-beautifulsoup4
+telethon
 maigret
+beautifulsoup4
+requests
+asyncio
