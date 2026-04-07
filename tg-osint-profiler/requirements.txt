@@ -1,5 +1,4 @@
 streamlit
 telethon
-maigret
 beautifulsoup4
 requests
