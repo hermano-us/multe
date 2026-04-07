@@ -1,0 +1,26 @@
+# Streamlit secrets — никогда не коммитим!
+.streamlit/
+
+# Telethon сессия (тоже чувствительная)
+tg_osint_session.session
+
+# Общие ненужные файлы для Python/Streamlit проекта
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Maigret временные файлы
+maigret_reports/
+
+# Streamlit cache
+.streamlit/cache/
+
+# Локальные настройки
+.DS_Store
+Thumbs.db
