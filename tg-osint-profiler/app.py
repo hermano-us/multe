@@ -117,46 +117,15 @@ async def fallback_parse(query: str):
 
 
 def run_maigret(username: str):
+    """Временная заглушка — Maigret отключён из-за проблем с установкой на Streamlit Cloud"""
     if not username:
-        return {"error": "Нет username для поиска"}
-
-    report_dir = "maigret_reports"
-    os.makedirs(report_dir, exist_ok=True)
-
-    try:
-        # Пытаемся установить maigret, если его ещё нет
-        import subprocess
-        subprocess.check_call(["pip", "install", "maigret", "--quiet"], 
-                            stdout=subprocess.DEVNULL, 
-                            stderr=subprocess.DEVNULL)
-        
-        cmd = [
-            "maigret", username,
-            "--json",
-            "-o", report_dir,
-            "--timeout", "20"
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        
-        report_path = os.path.join(report_dir, f"{username}.json")
-        
-        if os.path.exists(report_path):
-            with open(report_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # Удаляем временный файл
-            try:
-                os.remove(report_path)
-            except:
-                pass
-            return data
-        else:
-            return {"error": "Maigret не создал отчёт. Возможно, слишком много запросов."}
-            
-    except subprocess.TimeoutExpired:
-        return {"error": "Maigret слишком долго выполнялся (таймаут)"}
-    except Exception as e:
-        return {"error": f"Ошибка Maigret: {str(e)}"}
+        return {"error": "Нет username"}
+    
+    return {
+        "warning": "🔧 Поиск по другим сайтам (Maigret) временно отключён",
+        "message": "Мы работаем над стабильной версией. Пока пользуйтесь Telegram-данными.",
+        "sites": []  # пустой список, чтобы не ломало отображение
+    }
 
 
 # ====================== ИНТЕРФЕЙС ======================
