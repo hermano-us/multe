@@ -20,64 +20,76 @@ st.markdown("**Telethon + Maigret** | Поиск по username · ID · теле
 # ====================== TELETHON CLIENT С ПОДДЕРЖКОЙ 2FA ======================
 # ====================== TELETHON AUTH С 2FA (надёжная версия) ======================
 # ====================== TELETHON AUTH С ПОДДЕРЖКОЙ 2FA (исправлено) ======================
+# ====================== TELETHON AUTH С 2FA (финальная стабильная версия) ======================
 if "telethon_client" not in st.session_state:
     st.session_state.telethon_client = None
 
 if "auth_state" not in st.session_state:
-    st.session_state.auth_state = "phone"   # phone → code_sent → password → done
+    st.session_state.auth_state = "phone"
 if "phone" not in st.session_state:
     st.session_state.phone = ""
 if "phone_code_hash" not in st.session_state:
     st.session_state.phone_code_hash = None
 
-async def initialize_telethon():
-    client = TelegramClient(SESSION_NAME, int(API_ID), API_HASH)
-    await client.connect()
-    return client
+def run_async(coro):
+    """Безопасный запуск async кода в Streamlit"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 # ====================== ИНТЕРФЕЙС АВТОРИЗАЦИИ ======================
-if st.session_state.telethon_client is None or not asyncio.run(
-    st.session_state.telethon_client.is_user_authorized() if st.session_state.telethon_client else False
-):
-    
-    st.subheader("🔐 Авторизация в Telegram")
+authorized = False
+if st.session_state.telethon_client is not None:
+    try:
+        authorized = run_async(st.session_state.telethon_client.is_user_authorized())
+    except:
+        authorized = False
+
+if not authorized:
+    st.subheader("🔐 Авторизация в Telegram для поиска")
 
     if st.session_state.auth_state == "phone":
         phone = st.text_input("Номер телефона (+7XXXXXXXXXX)", 
                               value=st.session_state.phone, 
-                              key="phone_input")
+                              key="phone_input_unique")
         
         if st.button("📱 Отправить код", type="primary", use_container_width=True):
-            if not phone or not phone.startswith("+"):
-                st.error("Введите корректный номер телефона, начиная с +")
+            if not phone.startswith("+"):
+                st.error("Номер должен начинаться с +")
             else:
                 st.session_state.phone = phone
                 try:
-                    with st.spinner("Отправляем код..."):
-                        client = asyncio.run(initialize_telethon())
-                        sent = asyncio.run(client.send_code_request(phone))
+                    with st.spinner("Отправляем код в Telegram..."):
+                        client = TelegramClient(SESSION_NAME, int(API_ID), API_HASH)
+                        run_async(client.connect())
+                        sent = run_async(client.send_code_request(phone))
                         st.session_state.phone_code_hash = sent.phone_code_hash
                         st.session_state.telethon_client = client
                         st.session_state.auth_state = "code_sent"
-                        st.success("✅ Код отправлен в Telegram!")
+                        st.success("✅ Код отправлен!")
                         st.rerun()
                 except Exception as e:
                     st.error(f"Ошибка отправки кода: {str(e)}")
 
     elif st.session_state.auth_state == "code_sent":
         st.info(f"Код отправлен на **{st.session_state.phone}**")
-        code = st.text_input("Введите 5-значный код из Telegram", key="code_input")
+        code = st.text_input("Введите код из Telegram (5 цифр)", key="code_input_unique")
         
-        if st.button("✅ Подтвердить код", type="primary"):
+        if st.button("✅ Подтвердить код", type="primary", use_container_width=True):
             if not code:
                 st.error("Введите код")
             else:
                 try:
                     with st.spinner("Проверяем код..."):
-                        await st.session_state.telethon_client.sign_in(
-                            phone=st.session_state.phone,
-                            code=code.strip(),
-                            phone_code_hash=st.session_state.phone_code_hash
+                        result = run_async(
+                            st.session_state.telethon_client.sign_in(
+                                phone=st.session_state.phone,
+                                code=code.strip(),
+                                phone_code_hash=st.session_state.phone_code_hash
+                            )
                         )
                     st.success("✅ Код принят!")
                     st.session_state.auth_state = "done"
@@ -86,27 +98,27 @@ if st.session_state.telethon_client is None or not asyncio.run(
                     st.session_state.auth_state = "password"
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Ошибка при проверке кода: {str(e)}")
+                    st.error(f"Ошибка кода: {str(e)}")
 
     elif st.session_state.auth_state == "password":
-        st.warning("🔐 Требуется двухфакторный пароль (2FA)")
-        password = st.text_input("Введите пароль от 2FA", type="password", key="2fa_password")
+        st.warning("🔐 Включена двухфакторная аутентификация")
+        password = st.text_input("Введите пароль от 2FA", type="password", key="2fa_password_unique")
         
-        if st.button("🔓 Войти", type="primary"):
+        if st.button("🔓 Войти с 2FA", type="primary", use_container_width=True):
             if not password:
                 st.error("Введите пароль")
             else:
                 try:
-                    with st.spinner("Проверяем 2FA..."):
-                        await st.session_state.telethon_client.sign_in(password=password)
+                    with st.spinner("Проверяем пароль..."):
+                        run_async(st.session_state.telethon_client.sign_in(password=password))
                     st.success("✅ Авторизация с 2FA успешно завершена!")
                     st.session_state.auth_state = "done"
                     st.rerun()
                 except Exception as e:
                     st.error(f"Неверный 2FA пароль: {str(e)}")
 else:
-    st.success("✅ Вы успешно авторизованы в Telegram")
-    st.caption("Теперь можно выполнять поиск")
+    st.success("✅ Вы авторизованы в Telegram")
+    st.caption("Теперь можно выполнять OSINT-поиск")
     # Здесь будет основной поиск позже
 
 API_ID = st.secrets.get("API_ID") or os.getenv("API_ID")
